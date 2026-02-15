@@ -11,7 +11,7 @@ async def get_latest_price_file(url: str = Query(..., description="The URL of th
     
     # 1. השליח (Client) מביא את ה-HTML מהאתר
     html = client.get_html(url)
-    
+
     # 2. המוח (Parser) מוציא את כל הקישורים לקבצי המחירים
     links = parser.extract_links(html)
     

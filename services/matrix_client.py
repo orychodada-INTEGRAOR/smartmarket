@@ -10,7 +10,7 @@ class MatrixClient:
 
     def get_html(self, url: str) -> str:
         """פונקציה שמושכת את תוכן האתר (HTML)"""
-        try:
+        try: 
             response = requests.get(url, headers=self.headers, timeout=15)
             response.raise_for_status() # בדיקה שהדף נטען בהצלחה
             return response.text

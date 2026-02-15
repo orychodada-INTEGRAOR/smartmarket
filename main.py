@@ -9,7 +9,7 @@ app = FastAPI(
 
 # השורה הזו היא ה"דבק" שמחבר את המנוע של המטריקס ל-API
 app.include_router(matrix.router)
-
+  
 @app.get("/")
 def home():
     return {

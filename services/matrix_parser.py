@@ -4,7 +4,7 @@ class MatrixParser:
     def __init__(self):
         # מחפש קבצים שכתוב בהם Price (מחיר)
         self.file_pattern = re.compile(r'PriceFull|Price')
-
+ 
     def extract_links(self, html_content: str):
         # מוציא את כל הקישורים מהדף
         links = re.findall(r'href=[\'"]?([^\'" >]+)', html_content)
