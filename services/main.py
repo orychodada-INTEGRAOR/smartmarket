@@ -1,20 +1,17 @@
 from fastapi import FastAPI
 from services.data_sources import DataSources
-from services.scraper import VictoryScraper # וודא שהשורה הזו קיימת
+from services.scraper import VictoryScraper
 
-app = FastAPI(title="SmartMarket API")
+app = FastAPI()
 
 @app.get("/")
-def read_root():
-    return {"status": "SmartMarket is Online"}
+def home():
+    return {"status": "SmartMarket Online"}
 
 @app.get("/chains")
 def get_chains():
-    ds = DataSources()
-    return ds.get_data_sources()
+    return DataSources().get_data_sources()
 
-# הוסף את הבלוק הזה בסוף הקובץ:
 @app.get("/test-prices")
 def test_prices():
-    scraper = VictoryScraper()
-    return scraper.fetch_prices()
+    return VictoryScraper().fetch_prices()
