@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from services.data_sources import DataSources
+from data_sources import DataSources
 from scraper import VictoryScraper
 
 app = FastAPI()
