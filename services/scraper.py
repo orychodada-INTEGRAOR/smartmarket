@@ -9,9 +9,9 @@ class VictoryScraper:
         self.base_url = "https://matrixcatalog.co.il/Victory/"
 
     def get_latest_price_file(self):
-        # מוצא את הקובץ הכי חדש ברשימה
         response = requests.get(self.base_url)
-        soup = BeautifulSoup(response.text, "html.parser")
+        # שימוש ב-html.parser במקום lxml
+        soup = BeautifulSoup(response.text, "html.parser") 
         links = [a['href'] for a in soup.find_all('a', href=True) if "PriceFull" in a['href'] and a['href'].endswith(".gz")]
         return self.base_url + links[-1] if links else None
 
