@@ -41,6 +41,26 @@ if not latest_file:
 return processor.get_products(latest_file)
 
 
+@app.get("/get-products")
+def get_products(chain_url: str = None):
+    latest_file = parser.get_latest_price_file(chain_url)
+
+    if not latest_file:
+        return {"error": "לא נמצא קובץ מחיר לרשת"}
+
+    return processor.get_products(latest_file)
+
+
+@app.get("/get-products")
+def get_products(chain_url: str = None):
+    latest_file = parser.get_latest_price_file(chain_url)
+
+    if not latest_file:
+        return {"error": "לא נמצא קובץ מחיר לרשת"}
+
+    return processor.get_products(latest_file)
+
+
 @app.get("/view-products")
 def view_products(chain_url: str = None):
     # אם לא הבאנו לינק, השרת לוקח את של ויקטורי כברירת מחדל
