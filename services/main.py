@@ -22,3 +22,20 @@ def get_matrix():
         "status": "Active",
         "message": "Welcome to SmartMarket Infrastructure"
     }
+from fastapi import FastAPI
+from services.data_sources import DataSources # הייבוא של הקוד החדש
+
+app = FastAPI(title="SmartMarket - S&M")
+
+@app.get("/")
+def read_root():
+    return {"status": "SmartMarket is Online"}
+
+@app.get("/chains")
+def get_chains():
+    ds = DataSources()
+    try:
+        data = ds.get_data_sources()
+        return {"count": len(data), "chains": data}
+    except Exception as e:
+        return {"error": str(e)}
