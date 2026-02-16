@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+from matrix_parser import MatrixParser
 app = FastAPI()
 
 @app.get("/")
@@ -23,3 +23,10 @@ def test_prices():
             {"item": "לחם פרוס", "price": "7.10"}
         ]
     }
+@app.get("/get-latest-link")
+def get_latest_link():
+    parser = MatrixParser()
+    # דוגמה על ויקטורי
+    victory_catalog = "https://priece.victory.co.il/" 
+    latest_url = parser.get_latest_price_file(victory_catalog)
+    return {"chain": "Victory", "latest_price_file": latest_url}
