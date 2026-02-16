@@ -1,32 +1,25 @@
 from fastapi import FastAPI
 from matrix_parser import MatrixParser
+from data_processor import DataProcessor
+
 app = FastAPI()
+parser = MatrixParser()
+processor = DataProcessor()
 
 @app.get("/")
 def home():
-    return {"status": "SmartMarket Online", "msg": "S&M System is Live"}
+    return {"status": "SmartMarket Online", "msg": "Ready for Glide"}
 
-@app.get("/chains")
-def get_chains():
-    return [
-        {"name": "Victory", "url": "https://priece.victory.co.il"},
-        {"name": "Yohananof", "url": "https://yohananof.co.il"}
-    ]
-
-@app.get("/test-prices")
-def test_prices():
+@app.get("/view-products")
+def view_products():
+    # 1. מוצאים את הלינק העדכני
+    link = parser.get_latest_price_file()
+    
+    # 2. מעבדים את המוצרים מתוך הלינק
+    products = processor.get_products(link)
+    
     return {
-        "status": "Online",
-        "source": "Victory",
-        "data": [
-            {"item": "חלב תנובה 3%", "price": "6.23"},
-            {"item": "לחם פרוס", "price": "7.10"}
-        ]
+        "chain": "Victory",
+        "total_items": len(products) if isinstance(products, list) else 0,
+        "items": products
     }
-@app.get("/get-latest-link")
-def get_latest_link():
-    parser = MatrixParser()
-    # דוגמה על ויקטורי
-    victory_catalog = "https://priece.victory.co.il/" 
-    latest_url = parser.get_latest_price_file(victory_catalog)
-    return {"chain": "Victory", "latest_price_file": latest_url}
