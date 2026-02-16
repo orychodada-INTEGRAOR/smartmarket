@@ -39,3 +39,9 @@ def get_chains():
         return {"count": len(data), "chains": data}
     except Exception as e:
         return {"error": str(e)}
+    from services.scraper import VictoryScraper # תוסיף למעלה עם שאר הייבואים
+
+@app.get("/test-prices")
+def test_prices():
+    scraper = VictoryScraper()
+    return scraper.fetch_prices()
