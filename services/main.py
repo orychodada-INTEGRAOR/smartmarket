@@ -4,7 +4,14 @@ app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"status": "SmartMarket Online", "version": "1.1"}
+    return {"status": "SmartMarket Online", "msg": "S&M System is Live"}
+
+@app.get("/chains")
+def get_chains():
+    return [
+        {"name": "Victory", "url": "https://priece.victory.co.il"},
+        {"name": "Yohananof", "url": "https://yohananof.co.il"}
+    ]
 
 @app.get("/test-prices")
 def test_prices():
