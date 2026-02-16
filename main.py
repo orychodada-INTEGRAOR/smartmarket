@@ -35,7 +35,7 @@ def get_products(chain_key: str):
     if not chain_url:
         raise HTTPException(status_code=404, detail="רשת לא נמצאה")
 
-    latest_file = parser.get_latest_price_file(chain_url)
+    latest_file = parser.get_latest_price_file(chain_key)
     if not latest_file:
         return {"error": "לא נמצא קובץ מחיר לרשת"}
 
