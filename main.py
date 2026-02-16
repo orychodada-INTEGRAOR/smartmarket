@@ -48,7 +48,10 @@ def view_products(chain_url: str = None):
     קורא קובץ מחיר אמיתי מהאינטרנט ומחזיר מוצרים אמיתיים
     """
     # אם לא הבאנו לינק, השרת לוקח את של ויקטורי כברירת מחדל
-    target_url = chain_url or "https://priece.victory.co.il/PriceFull7290696200003-010-202602160400.gz"
-
+    @app.get("/view-products")
+def view_products(chain_url: str = None):
+    # ברירת מחדל: קובץ מחיר אמיתי של שופרסל
+    target_url = chain_url or "https://matrixcatalog.co.il/shufersal/PriceFull7290027600007-001-202402010400.gz"
+    
     products = processor.get_real_data(target_url)
     return {"items": products}
