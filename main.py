@@ -24,7 +24,7 @@ def read_root():
 @app.get("/api/products")
 def get_products():
     # הלינק המעודכן שסיפקת (תקף ל-18/02/2026 שעה 17:00)
-    url = "https://prices.shufersal.co.il/FileObject/DownloadFile?FileName=Price7290027600007-001-202602181700.gz&FileType=gz"
+    url = "https://supersapir.binaprojects.com/Download.aspx?File=Price7290058156016-264-202602181811.gz"
     
     processor = DataProcessor()
     try:
