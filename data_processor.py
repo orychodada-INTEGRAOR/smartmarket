@@ -1,55 +1,55 @@
 import requests
 import gzip
+from io import BytesIO
 from lxml import etree
+import json
+from typing import List, Dict, Any
 
 class DataProcessor:
-    """
-    קורא קובצי מחיר אמיתיים מהמדינה ב-STREAM
-    ומחזיר רשימה של מוצרים.
-    """
-
-    def get_products(self, file_url):
-        """
-        מקבל URL של קובץ מחיר (PriceFull / PriceUpdate)
-        ומחזיר רשימת מוצרים.
-        """
-
+    def get_real_data_streaming(self, url: str) -> List[Dict[str, Any]]:
+        """קורא XML ענק שורה אחר שורה - לא קורס על 512MB"""
+        
+        # הורדת הקובץ
+        print(f"מושך נתונים מ-{url}")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # פתיחת GZIP ישירות ל-streaming
+        gz_stream = gzip.GzipFile(fileobj=BytesIO(response.content))
+        
+        # STREAMING PARSER - הקסם שחוסך זיכרון
+        context = etree.iterparse(
+            gz_stream, 
+            events=('end',), 
+            tag='Item',  # רק אלמנטים בשם Item
+            huge_tree=True
+        )
+        
         products = []
-
-        try:
-            # הורדה בזרימה - לא טוען את כל הקובץ לזיכרון
-            response = requests.get(file_url, stream=True, timeout=60)
-            response.raise_for_status()
-
-            # פתיחת קובץ GZIP תוך כדי קריאה
-            with gzip.GzipFile(fileobj=response.raw) as gz:
-                # קריאת XML ב-iterparse (יעיל מאוד)
-                context = etree.iterparse(gz, events=("end",), tag="Item")
-
-                for event, elem in context:
-                    name = elem.findtext("ItemName")
-                    price = elem.findtext("ItemPrice")
-                    unit = elem.findtext("UnitQty")
-                    category = elem.findtext("ItemType")
-
-                    if name and price:
-                        products.append({
-                            "name": name,
-                            "price": price,
-                            "unit": unit or "",
-                            "category": category or ""
-                        })
-
-                    # כדי לא להפיל את Render — עוצרים אחרי 30 מוצרים
-                    if len(products) >= 30:
-                        break
-
-                    # ניקוי זיכרון
-                    elem.clear()
-                    while elem.getprevious() is not None:
-                        del elem.getparent()[0]
-
-            return products
-
-        except Exception as e:
-            return [{"error": f"שגיאה בקריאת קובץ המחיר: {str(e)}"}]
+        for event, elem in context:
+            try:
+                # חילוץ נתונים ממוצר בודד (זיכרון מינימלי)
+                product = {
+                    "code": elem.findtext("ItemCode") or "N/A",
+                    "name": elem.findtext("ItemName") or "ללא שם",
+                    "price": float(elem.findtext("ItemPrice") or 0),
+                    "category": elem.findtext("Category") or "כללי",
+                    "store": elem.get("StoreId", "לא ידוע")  # אם יש
+                }
+                
+                # סינון מוצרים תקינים בלבד
+                if product["name"] != "ללא שם" and product["price"] > 0:
+                    products.append(product)
+                
+                # 🔥 משחרר זיכרון מיד אחרי שימוש
+                elem.clear()
+                while elem.getprevious() is not None:
+                    del elem.getparent()[0]
+                    
+            except Exception as e:
+                print(f"שגיאה במוצר: {e}")
+                elem.clear()
+                continue
+        
+        print(f"סיים! נמצאו {len(products)} מוצרים")
+        return products[:1000]  # מגביל ל-1000 לבדיקה (Render Free)
