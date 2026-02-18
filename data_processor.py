@@ -10,19 +10,20 @@ class DataProcessor:
         }
 
         try:
-            response = requests.get(url, stream=True, headers=headers, timeout=30)
+            # הורדת כל התוכן לזיכרון כדי למנוע בעיות Seek
+            response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
             
-            # בדיקה אם הקובץ באמת דחוס (GZIP מתחיל ב-1f 8b)
-            content = response.raw.read(2)
-            response.raw._fp.fp.seek(0) # חזרה לתחילת הקובץ
+            file_content = response.content
             
-            if content.startswith(b'\x1f\x8b'):
-                source = gzip.GzipFile(fileobj=response.raw)
+            # בדיקה אם הקובץ דחוס (GZIP מתחיל ב-1f 8b)
+            if file_content.startswith(b'\x1f\x8b'):
+                source = gzip.GzipFile(fileobj=BytesIO(file_content))
             else:
-                source = response.raw
+                source = BytesIO(file_content)
 
             products = []
+            # סריקה של ה-XML
             context = ET.iterparse(source, events=("end",))
             
             count = 0
@@ -37,7 +38,8 @@ class DataProcessor:
                     products.append(product)
                     count += 1
                     elem.clear()
-                    if count >= 100: break
+                    if count >= 100: # הגבלה לטעינה מהירה בבדיקה
+                        break
             
             return products
 
