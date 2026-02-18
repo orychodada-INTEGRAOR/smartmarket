@@ -76,10 +76,8 @@ async def get_stores():
 
 if __name__ == "__main__":
     import uvicorn
- import os
-
-if __name__ == "__main__":
-    import uvicorn
-    # Railway נותן לנו את הפורט במשתנה סביבה. אם הוא לא קיים, נשתמש ב-8000
+    import os
+    # Railway מגדיר את הפורט במשתנה סביבה בשם PORT
     port = int(os.environ.get("PORT", 8000))
+    # חובה להשתמש ב-0.0.0.0 כדי שיהיה נגיש מבחוץ
     uvicorn.run(app, host="0.0.0.0", port=port)
