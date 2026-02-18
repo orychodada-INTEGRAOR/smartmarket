@@ -21,7 +21,7 @@ async def get_products():
     """מחזיר מוצרים בזמן אמת מרשת אחת"""
     
     # URL אמיתי של שופרסל לדוגמה (תחליף לקובץ אמיתי)
-    url = "https://example-shufersal.com/prices.xml.gz"  
+    url = "https://matrixcatalog.co.il/Victory/PriceFull7290696200003-001-202602180400.gz" 
     # או URL אמיתי שתמצא באתר הרשת
     
     try:
