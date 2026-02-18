@@ -1,55 +1,56 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from data_processor import DataProcessor
-import os
+import logging
 
-app = FastAPI(title="SmartMarket API")
+# הגדרת לוגים למעקב ב-Railway
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# הגדרות CORS לחיבור Glide ו-Google Sheets
+app = FastAPI()
+
+# הגדרת CORS כדי ש-Google Sheets ו-Glide יוכלו למשוך נתונים
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-processor = DataProcessor()
-
 @app.get("/")
-async def root():
-    return {"message": "SmartMarket API חי ובועט! 🚀"}
+def read_root():
+    return {"message": "SmartMarket API is Live", "status": "Online"}
 
 @app.get("/api/products")
-async def get_products():
-    """שליפת מחירים אמיתיים משופרסל ל-Google Sheets ו-Glide"""
+def get_products():
+    # הלינק המעודכן שסיפקת (תקף ל-18/02/2026 שעה 17:00)
+    url = "https://prices.shufersal.co.il/FileObject/DownloadFile?FileName=Price7290027600007-001-202602181700.gz&FileType=gz"
     
-    # URL מעודכן להיום (18.02.2026) של סניף שופרסל
-    url = "https://prices.shufersal.co.il/FileObject/DownloadFile?FileName=Price7290027600007-001-202602181100.gz&FileType=gz"
-    
+    processor = DataProcessor()
     try:
-        # כאן אנחנו מפעילים את פונקציית ה-Streaming שחוסכת זיכרון
+        logger.info(f"Attempting to fetch data from: {url}")
         products = processor.get_real_data_streaming(url)
-        
         return {
             "status": "success",
-            "updated": "2026-02-18",
-            "source": "שופרסל סניף 001",
-            "products": products  # מחזיר את 100 המוצרים שהגדרנו במעבד
+            "source": "Shufersal Real-time",
+            "count": len(products),
+            "products": products
         }
     except Exception as e:
-        # אם יש בעיה בקישור של שופרסל, השרת לא יקרוס ויחזיר נתוני גיבוי
+        logger.error(f"Error fetching real data: {e}")
+        # מנגנון גיבוי (Fallback) כדי שהאפליקציה לא תציג דף ריק
         return {
             "status": "partial_success",
             "message": f"סריקה נכשלה: {str(e)}",
             "products": [
                 {"name": "חלב תנובה 1% (גיבוי)", "price": "5.87", "store": "שופרסל"},
-                {"name": "לחם קליה (גיבוי)", "price": "4.99", "store": "שופרסל"}
+                {"name": "לחם קליה (גיבוי)", "price": "4.99", "store": "שופרסל"},
+                {"name": "גבינה לבנה 5% (גיבוי)", "price": "5.20", "store": "שופרסל"}
             ]
         }
 
 if __name__ == "__main__":
     import uvicorn
-    # הגדרות קריטיות ל-Railway
+    import os
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
