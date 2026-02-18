@@ -35,10 +35,11 @@ async def get_products():
     url = "https://prices.shufersal.co.il/FileObject/DownloadFile?FileName=Price7290027600007-001-202602181100.gz&FileType=gz"
     
     try:
-        products = processor.get_real_data_streaming(url)
+products = processor.get_real_data_streaming(url)
         return {
             "status": "success",
-            "count": len(products),
+            "products": products  # חשוב מאוד שהמילה products תהיה כאן!
+        }
             "updated": "2026-02-18 11:00",
             "source": "שופרסל סניף 001",
             "data": products[:50]  # 50 מוצרים ראשונים
