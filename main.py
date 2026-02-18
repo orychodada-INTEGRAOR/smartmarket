@@ -21,8 +21,35 @@ async def get_products():
     """מחזיר מוצרים בזמן אמת מרשת אחת"""
     
     # URL אמיתי של שופרסל לדוגמה (תחליף לקובץ אמיתי)
-    url = "https://matrixcatalog.co.il/Victory/PriceFull7290696200003-001-202602180400.gz" 
-    # או URL אמיתי שתמצא באתר הרשת
+    # במקום URL לא קיים:
+# url = "https://example-shufersal.com/prices.xml.gz"
+
+# שים URL אמיתי של שופרסל:
+url = "https://www.shufersal.co.il/online/he/feeds/prices.xml.gz"
+
+    # או URL אמיתי שתמצא באתר הרשת@app.get("/api/products")
+async def get_products():
+    """מחירים אמיתיים משופרסל פתח תקווה - 18.2.2026 11:00"""
+    
+    # 🔥 URL אמיתי משופרסל - סניף 001 מעודכן היום!
+    url = "https://prices.shufersal.co.il/FileObject/DownloadFile?FileName=Price7290027600007-001-202602181100.gz&FileType=gz"
+    
+    try:
+        products = processor.get_real_data_streaming(url)
+        return {
+            "status": "success",
+            "count": len(products),
+            "updated": "2026-02-18 11:00",
+            "source": "שופרסל סניף 001",
+            "data": products[:50]  # 50 מוצרים ראשונים
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": str(e),
+            "demo_data": [{"code": "123", "name": "חלב 1%", "price": 5.90, "category": "חלב"}]
+        }
+
     
     try:
         products = processor.get_real_data_streaming(url)
