@@ -5,34 +5,32 @@ from io import BytesIO
 
 class DataProcessor:
     def get_real_data_streaming(self, url: str):
-        # הורדת הקובץ בזרם (Stream) כדי לא לחנוק את השרת
+        # מורידים את הקובץ כזרם (Stream) - לא תופס זיכרון
         response = requests.get(url, stream=True)
         response.raise_for_status()
 
-        # פתיחת ה-GZIP בזרם
+        # פתיחת ה-GZIP תוך כדי תנועה
         with gzip.GzipFile(fileobj=response.raw) as gz:
             products = []
-            # שימוש ב-iterparse מאפשר לעבור על ה-XML פריט פריט
+            # iterparse סורק את ה-XML פריט אחרי פריט בלי לטעון את כולו
             context = ET.iterparse(gz, events=("end",))
             
             count = 0
             for event, elem in context:
                 if elem.tag == "Item":
-                    # שליפת הנתונים מהפריט הנוכחי בלבד
+                    # שואבים רק את מה שצריך
                     product = {
-                        "code": elem.findtext("ItemCode"),
-                        "name": elem.findtext("ItemName"),
-                        "price": elem.findtext("ItemPrice"),
-                        "category": elem.findtext("CategoryName") or "כללי",
+                        "name": elem.findtext("ItemName") or "ללא שם",
+                        "price": elem.findtext("ItemPrice") or "0",
                         "store": "שופרסל"
                     }
                     products.append(product)
                     count += 1
                     
-                    # מנקים את הזיכרון מהאלמנט שסיימנו לעבוד עליו
+                    # השורה הקריטית: מנקים את הזיכרון מהפריט שסיימנו
                     elem.clear()
                     
-                    # הגבלה ל-100 מוצרים כדי שהגיליון וה-API יגיבו מהר
+                    # הגבלה ל-100 מוצרים ראשונים - יציב ומהיר לגיליון
                     if count >= 100:
                         break
             
