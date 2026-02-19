@@ -5,56 +5,46 @@ from io import BytesIO
 
 class DataProcessor:
     def get_real_data_streaming(self, url: str):
-        # הגדרת דפדפן "אנושי" מזויף
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,all;q=0.8',
-            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Referer': 'https://kingstore.binaprojects.com/Main.aspx',
-            'Connection': 'keep-alive',
         }
 
         try:
-            # שימוש ב-Session כדי לשמור על חיבור רציף
-            session = requests.Session()
-            # קודם כל "מבקרים" באתר כדי לקבל אישור (Cookie)
-            session.get("https://kingstore.binaprojects.com/Main.aspx", headers=headers, timeout=15)
+            # הורדת הקובץ
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
             
-            # עכשיו מורידים את הקובץ עם האישור שקיבלנו
-            response = session.get(url, headers=headers, timeout=30)
-            
-            if not response.content:
-                raise Exception("The server returned an empty file (Blocked).")
-
-            file_content = response.content
-            
-            # בדיקת GZIP
-            if file_content.startswith(b'\x1f\x8b'):
-                source = gzip.GzipFile(fileobj=BytesIO(file_content))
+            # פתיחת ה-GZIP בזיכרון (כמו שעשית עם 7-Zip, רק אוטומטי)
+            if response.content.startswith(b'\x1f\x8b'):
+                source = gzip.GzipFile(fileobj=BytesIO(response.content))
+                xml_content = source.read()
             else:
-                source = BytesIO(file_content)
+                xml_content = response.content
 
+            # פיענוח ה-XML
+            root = ET.fromstring(xml_content)
+            
             products = []
-            context = ET.iterparse(source, events=("end",))
-            
-            count = 0
-            for event, elem in context:
-                tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
-                if tag == "Item":
-                    product = {
-                        "name": elem.findtext(".//ItemName") or "ללא שם",
-                        "price": elem.findtext(".//ItemPrice") or "0",
-                        "store": "קינג סטור"
-                    }
-                    products.append(product)
-                    count += 1
-                    elem.clear()
-                    if count >= 100: break
-            
-            if not products:
-                raise Exception("XML parsed but no items found.")
+            # שליפת המידע המפורט בדיוק לפי ה-Converter שלך
+            for item in root.findall('.//Item'):
+                product = {
+                    "code": item.findtext('ItemCode') or '',
+                    "name": item.findtext('ItemNm') or '', # שימוש ב-ItemNm כפי שמופיע בקובץ שלך
+                    "manufacturer": item.findtext('ManufacturerName') or 'לא ידוע',
+                    "price": item.findtext('ItemPrice') or '0',
+                    "unit_measure": item.findtext('UnitOfMeasure') or '',
+                    "quantity": item.findtext('Quantity') or '',
+                    "unit_price": item.findtext('UnitOfMeasurePrice') or '',
+                    "country": item.findtext('ManufactureCountry') or '',
+                    "store": "קינג סטור"
+                }
+                products.append(product)
                 
+                # הגבלה ל-100 מוצרים ראשונים לבדיקה מהירה
+                if len(products) >= 100:
+                    break
+            
             return products
 
         except Exception as e:
-            raise Exception(f"Failed to fetch data: {str(e)}")
+            raise Exception(f"שגיאה בעיבוד הנתונים המקצועי: {str(e)}")
