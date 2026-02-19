@@ -4,3 +4,4 @@ requests==2.32.3
 lxml==5.3.0
 openpyxl
 pandas
+beautifulsoup4

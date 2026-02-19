@@ -1,43 +1,45 @@
 from fastapi import FastAPI
 import requests
+import re
 import gzip
 import xml.etree.ElementTree as ET
 import json
 import os
-import re
+from bs4 import BeautifulSoup
 
 app = FastAPI()
 
-MAIN_PAGE = "https://kingstore.binaprojects.com/Main.aspx"
+MAIN_URL = "https://kingstore.binaprojects.com/Main.aspx"
 
 @app.get("/scan-all")
 async def scan_all():
     try:
-        # 1. סרוק דף ראשי - חפש כל קבצי .gz
-        print("🔍 סורק kingstore...")
-        r = requests.get(MAIN_PAGE)
-        page_content = r.text
+        # 1. סרוק את הדף הראשי
+        r = requests.get(MAIN_URL)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        all_links = []
         
-        # חפש קישורים ל-Price*.gz
-        price_links = re.findall(r'href=[\'"]Download\.aspx\?File=Price[^\'"]*gz[\'"]', page_content)
-        promo_links = re.findall(r'href=[\'"]Download\.aspx\?File=Promo[^\'"]*gz[\'"]', page_content)
+        # 2. חפש כל קישור עם Download.aspx?File=
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if 'Download.aspx?File=' in href and '.gz' in href:
+                full_url = href if href.startswith('http') else f"https://kingstore.binaprojects.com/{href}"
+                all_links.append(full_url)
         
-        all_links = list(set(price_links + promo_links))
+        print(f"📡 נמצאו {len(all_links)} קישורים")
+        
         products = []
-        
-        # 2. הורד + פרס כל קובץ
-        for link in all_links[:5]:  # 5 קבצים מקסימום
-            full_url = f"https://kingstore.binaprojects.com/{link.split('href=')[1].strip('\"')}"
-            print(f"📥 מנסה: {full_url}")
+        for i, url in enumerate(all_links[:10]):  # 10 קבצים מקס
+            print(f"📥 {i+1}/10: {url}")
             
             try:
-                file_r = requests.get(full_url, timeout=10)
+                file_r = requests.get(url, timeout=15)
                 if file_r.status_code == 200:
-                    filename = full_url.split('File=')[-1].replace('.gz', '.txt')
+                    filename = f"file_{i}.gz"
                     with open(filename, "wb") as f:
                         f.write(file_r.content)
                     
-                    # 3. נסה לקרוא כXML
+                    # קרא תוכן
                     content = ""
                     try:
                         with gzip.open(filename, 'rt', encoding='utf-8') as f:
@@ -46,32 +48,33 @@ async def scan_all():
                         with open(filename, 'r', encoding='utf-8') as f:
                             content = f.read()
                     
-                    # 4. בדוק אם XML תקין
+                    # אם XML → חלץ מוצרים
                     if content.strip().startswith('<'):
                         root = ET.fromstring(content)
-                        for item in root.findall('.//Item'):
+                        items = root.findall('.//Item')
+                        print(f"✅ {filename}: {len(items)} מוצרים")
+                        
+                        for item in items[:50]:  # 50 מוצרים מקס לקובץ
                             name = item.find('ItemNm')
                             price = item.find('ItemPrice')
                             if name is not None and price is not None:
                                 products.append({
                                     'שם': name.text or '',
                                     'מחיר': price.text or '',
-                                    'מקור': filename
+                                    'מקור': url
                                 })
-                    else:
-                        print(f"ℹ️ {filename}: לא XML")
                         
             except Exception as e:
-                print(f"❌ {full_url}: {e}")
+                print(f"❌ {url}: {e}")
                 continue
         
-        # 5. שמור
+        # שמור
         with open("products.json", "w", encoding='utf-8') as f:
             json.dump(products, f, ensure_ascii=False, indent=2)
         
         return {
             "status": "✅ סריקה הושלמה!",
-            "קישורים_נמצאו": len(all_links),
+            "קישורים": len(all_links),
             "מוצרים": len(products),
             "דוגמאות": products[:3]
         }
@@ -86,10 +89,10 @@ async def get_products(search: str = ""):
             products = json.load(f)
         if search:
             products = [p for p in products if search.lower() in str(p.get('שם', '')).lower()]
-        return products[:50]
+        return products[:20]
     except:
         return []
 
 @app.get("/")
 async def root():
-    return {"SmartMarket": "קרא /scan-all - סריקת אתר"}
+    return {"SmartMarket": "קרא /scan-all (משופר עם BeautifulSoup)"}
