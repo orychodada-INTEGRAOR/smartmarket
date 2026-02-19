@@ -7,69 +7,52 @@ import os
 
 app = FastAPI()
 
-@app.get("/update-all")
-async def update_all():
+# הקובץ החי שנתת!
+PRICE_URL = "https://kingstore.binaprojects.com/Download.aspx?File=Price7290058108879-340-202602191110.gz"
+
+@app.get("/update-prices")
+async def update_prices():
     try:
-        # 1. הורד רשימת קישורים
-        list_url = "https://kingstore.binaprojects.com/Download.aspx?File=Promo7290058108879-340-202602191114.gz"
-        r = requests.get(list_url)
-        with open("list.json", "wb") as f:
+        print("📥 מוריד מחירון...")
+        r = requests.get(PRICE_URL)
+        with open("price.gz", "wb") as f:
             f.write(r.content)
         
-        # 2. קרא רשימת קישורים
+        # קרא חכם (gz או רגיל)
         content = ""
         try:
-            with gzip.open("list.json", 'rt') as f:
+            with gzip.open("price.gz", 'rt', encoding='utf-8') as f:
                 content = f.read()
         except:
-            with open("list.json", 'r') as f:
+            with open("price.gz", 'r', encoding='utf-8') as f:
                 content = f.read()
         
-        links = json.loads(content)
-        all_products = []
+        # פרס XML
+        root = ET.fromstring(content)
+        products = []
         
-        # 3. הורד כל קובץ ברשימה
-        for link_data in links:
-            spath = link_data.get('SPath', '')
-            if 'kingstore.binaprojects.com/Download/' in spath:
-                print(f"📥 מוריד: {spath}")
-                try:
-                    file_r = requests.get(spath)
-                    filename = spath.split('/')[-1]
-                    with open(filename, "wb") as f:
-                        f.write(file_r.content)
-                    
-                    # 4. פרס XML
-                    xml_content = ""
-                    try:
-                        with gzip.open(filename, 'rt') as f:
-                            xml_content = f.read()
-                    except:
-                        with open(filename, 'r') as f:
-                            xml_content = f.read()
-                    
-                    root = ET.fromstring(xml_content)
-                    for item in root.findall('.//Item'):
-                        product = {
-                            'קוד': item.find('ItemCode').text if item.find('ItemCode') else '',
-                            'שם': item.find('ItemNm').text if item.find('ItemNm') else '',
-                            'מחיר': item.find('ItemPrice').text if item.find('ItemPrice') else ''
-                        }
-                        if product['שם']:  # רק מוצרים עם שם
-                            all_products.append(product)
-                            
-                except Exception as file_error:
-                    print(f"❌ שגיאה בקובץ {spath}: {file_error}")
-                    continue
+        print(f"מטפל ב-{len(root.findall('.//Item'))} מוצרים...")
         
-        # 5. שמור הכל
+        for item in root.findall('.//Item'):
+            product = {
+                'קוד': item.find('ItemCode').text if item.find('ItemCode') else '',
+                'שם': item.find('ItemNm').text if item.find('ItemNm') else '',
+                'יצרן': item.find('ManufacturerName').text if item.find('ManufacturerName') else '',
+                'מחיר': item.find('ItemPrice').text if item.find('ItemPrice') else '',
+                'יחידה': item.find('UnitOfMeasure').text if item.find('UnitOfMeasure') else ''
+            }
+            # רק מוצרים עם שם
+            if product['שם']:
+                products.append(product)
+        
+        # שמור JSON
         with open("products.json", "w", encoding='utf-8') as f:
-            json.dump(all_products, f, ensure_ascii=False, indent=2)
+            json.dump(products, f, ensure_ascii=False, indent=2)
         
         return {
-            "status": "✅ הושלם!", 
-            "מוצרים": len(all_products),
-            "קישורים": len(links)
+            "status": "✅ מחירון עודכן!", 
+            "מוצרים": len(products),
+            "דוגמה": products[:3] if products else []
         }
         
     except Exception as e:
@@ -82,10 +65,10 @@ async def get_products(search: str = ""):
             products = json.load(f)
         if search:
             products = [p for p in products if search.lower() in str(p.get('שם', '')).lower()]
-        return products[:20]
+        return products[:50]
     except:
         return []
 
 @app.get("/")
 async def root():
-    return {"SmartMarket": "קרא /update-all"}
+    return {"SmartMarket": "קרא /update-prices"}
