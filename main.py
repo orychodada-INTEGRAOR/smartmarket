@@ -7,74 +7,85 @@ import os
 
 app = FastAPI()
 
-PROMO_URL = "https://kingstore.binaprojects.com/Download.aspx?File=Promo7290058108879-340-202602191114.gz"
-
-def read_file_smart(filename):
-    """קורא gz, XML, או JSON - חכם!"""
+@app.get("/update-all")
+async def update_all():
     try:
-        # נסה gz קודם
-        with gzip.open(filename, 'rt', encoding='utf-8') as f:
-            return f.read()
-    except:
-        # אם לא gz - קרא רגיל
-        try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                return f.read()
-        except:
-            return None
-
-@app.get("/update-promo")
-async def update_promo():
-    try:
-        # 1. הורד קובץ
-        r = requests.get(PROMO_URL)
-        with open("promo.gz", "wb") as f:
+        # 1. הורד רשימת קישורים
+        list_url = "https://kingstore.binaprojects.com/Download.aspx?File=Promo7290058108879-340-202602191114.gz"
+        r = requests.get(list_url)
+        with open("list.json", "wb") as f:
             f.write(r.content)
         
-        # 2. קרא חכם (gz/XML/JSON)
-        content = read_file_smart("promo.gz")
-        if not content:
-            return {"status": "❌ קובץ ריק"}
-        
-        # 3. נסה XML
+        # 2. קרא רשימת קישורים
+        content = ""
         try:
-            root = ET.fromstring(content)
-            promotions = []
-            
-            for promotion in root.findall('.//Promotion'):
-                promo_data = {
-                    'תיאור': promotion.find('PromotionDescription').text or '',
-                    'תאריך': promotion.find('PromotionUpdateDate').text or '',
-                    'מחיר': promotion.find('DiscountedPrice').text or '',
-                    'מינימום': promotion.find('MinQty').text or '',
-                    'מוצרים': [item.find('ItemCode').text for item in promotion.findall('.//Item') if item.find('ItemCode')]
-                }
-                promotions.append(promo_data)
-            
-            # שמור JSON
-            with open("promotions.json", "w", encoding='utf-8') as f:
-                json.dump(promotions, f, ensure_ascii=False, indent=2)
-            
-            return {"status": "✅ מבצעים!", "מבצעים": len(promotions)}
-            
+            with gzip.open("list.json", 'rt') as f:
+                content = f.read()
         except:
-            # אם לא XML - החזר תוכן גולמי
-            return {"status": "ℹ️ לא XML", "תוכן": content[:500]}
-            
+            with open("list.json", 'r') as f:
+                content = f.read()
+        
+        links = json.loads(content)
+        all_products = []
+        
+        # 3. הורד כל קובץ ברשימה
+        for link_data in links:
+            spath = link_data.get('SPath', '')
+            if 'kingstore.binaprojects.com/Download/' in spath:
+                print(f"📥 מוריד: {spath}")
+                try:
+                    file_r = requests.get(spath)
+                    filename = spath.split('/')[-1]
+                    with open(filename, "wb") as f:
+                        f.write(file_r.content)
+                    
+                    # 4. פרס XML
+                    xml_content = ""
+                    try:
+                        with gzip.open(filename, 'rt') as f:
+                            xml_content = f.read()
+                    except:
+                        with open(filename, 'r') as f:
+                            xml_content = f.read()
+                    
+                    root = ET.fromstring(xml_content)
+                    for item in root.findall('.//Item'):
+                        product = {
+                            'קוד': item.find('ItemCode').text if item.find('ItemCode') else '',
+                            'שם': item.find('ItemNm').text if item.find('ItemNm') else '',
+                            'מחיר': item.find('ItemPrice').text if item.find('ItemPrice') else ''
+                        }
+                        if product['שם']:  # רק מוצרים עם שם
+                            all_products.append(product)
+                            
+                except Exception as file_error:
+                    print(f"❌ שגיאה בקובץ {spath}: {file_error}")
+                    continue
+        
+        # 5. שמור הכל
+        with open("products.json", "w", encoding='utf-8') as f:
+            json.dump(all_products, f, ensure_ascii=False, indent=2)
+        
+        return {
+            "status": "✅ הושלם!", 
+            "מוצרים": len(all_products),
+            "קישורים": len(links)
+        }
+        
     except Exception as e:
         return {"status": "❌ שגיאה", "error": str(e)}
 
-@app.get("/api/promo")
-async def get_promo(search: str = ""):
+@app.get("/api/products")
+async def get_products(search: str = ""):
     try:
-        with open("promotions.json", "r", encoding='utf-8') as f:
-            promos = json.load(f)
+        with open("products.json", "r", encoding='utf-8') as f:
+            products = json.load(f)
         if search:
-            promos = [p for p in promos if search in str(p.get('תיאור', ''))]
-        return promos[:10]
+            products = [p for p in products if search.lower() in str(p.get('שם', '')).lower()]
+        return products[:20]
     except:
         return []
 
 @app.get("/")
 async def root():
-    return {"SmartMarket": "קרא /update-promo"}
+    return {"SmartMarket": "קרא /update-all"}
