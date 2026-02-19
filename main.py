@@ -4,55 +4,76 @@ import gzip
 import xml.etree.ElementTree as ET
 import json
 import os
+import re
 
 app = FastAPI()
 
-# הקובץ החי שנתת!
-PRICE_URL = "https://kingstore.binaprojects.com/Download.aspx?File=Price7290058108879-340-202602191110.gz"
+MAIN_PAGE = "https://kingstore.binaprojects.com/Main.aspx"
 
-@app.get("/update-prices")
-async def update_prices():
+@app.get("/scan-all")
+async def scan_all():
     try:
-        print("📥 מוריד מחירון...")
-        r = requests.get(PRICE_URL)
-        with open("price.gz", "wb") as f:
-            f.write(r.content)
+        # 1. סרוק דף ראשי - חפש כל קבצי .gz
+        print("🔍 סורק kingstore...")
+        r = requests.get(MAIN_PAGE)
+        page_content = r.text
         
-        # קרא חכם (gz או רגיל)
-        content = ""
-        try:
-            with gzip.open("price.gz", 'rt', encoding='utf-8') as f:
-                content = f.read()
-        except:
-            with open("price.gz", 'r', encoding='utf-8') as f:
-                content = f.read()
+        # חפש קישורים ל-Price*.gz
+        price_links = re.findall(r'href=[\'"]Download\.aspx\?File=Price[^\'"]*gz[\'"]', page_content)
+        promo_links = re.findall(r'href=[\'"]Download\.aspx\?File=Promo[^\'"]*gz[\'"]', page_content)
         
-        # פרס XML
-        root = ET.fromstring(content)
+        all_links = list(set(price_links + promo_links))
         products = []
         
-        print(f"מטפל ב-{len(root.findall('.//Item'))} מוצרים...")
+        # 2. הורד + פרס כל קובץ
+        for link in all_links[:5]:  # 5 קבצים מקסימום
+            full_url = f"https://kingstore.binaprojects.com/{link.split('href=')[1].strip('\"')}"
+            print(f"📥 מנסה: {full_url}")
+            
+            try:
+                file_r = requests.get(full_url, timeout=10)
+                if file_r.status_code == 200:
+                    filename = full_url.split('File=')[-1].replace('.gz', '.txt')
+                    with open(filename, "wb") as f:
+                        f.write(file_r.content)
+                    
+                    # 3. נסה לקרוא כXML
+                    content = ""
+                    try:
+                        with gzip.open(filename, 'rt', encoding='utf-8') as f:
+                            content = f.read()
+                    except:
+                        with open(filename, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                    
+                    # 4. בדוק אם XML תקין
+                    if content.strip().startswith('<'):
+                        root = ET.fromstring(content)
+                        for item in root.findall('.//Item'):
+                            name = item.find('ItemNm')
+                            price = item.find('ItemPrice')
+                            if name is not None and price is not None:
+                                products.append({
+                                    'שם': name.text or '',
+                                    'מחיר': price.text or '',
+                                    'מקור': filename
+                                })
+                    else:
+                        print(f"ℹ️ {filename}: לא XML")
+                        
+            except Exception as e:
+                print(f"❌ {full_url}: {e}")
+                continue
         
-        for item in root.findall('.//Item'):
-            product = {
-                'קוד': item.find('ItemCode').text if item.find('ItemCode') else '',
-                'שם': item.find('ItemNm').text if item.find('ItemNm') else '',
-                'יצרן': item.find('ManufacturerName').text if item.find('ManufacturerName') else '',
-                'מחיר': item.find('ItemPrice').text if item.find('ItemPrice') else '',
-                'יחידה': item.find('UnitOfMeasure').text if item.find('UnitOfMeasure') else ''
-            }
-            # רק מוצרים עם שם
-            if product['שם']:
-                products.append(product)
-        
-        # שמור JSON
+        # 5. שמור
         with open("products.json", "w", encoding='utf-8') as f:
             json.dump(products, f, ensure_ascii=False, indent=2)
         
         return {
-            "status": "✅ מחירון עודכן!", 
+            "status": "✅ סריקה הושלמה!",
+            "קישורים_נמצאו": len(all_links),
             "מוצרים": len(products),
-            "דוגמה": products[:3] if products else []
+            "דוגמאות": products[:3]
         }
         
     except Exception as e:
@@ -71,4 +92,4 @@ async def get_products(search: str = ""):
 
 @app.get("/")
 async def root():
-    return {"SmartMarket": "קרא /update-prices"}
+    return {"SmartMarket": "קרא /scan-all - סריקת אתר"}
