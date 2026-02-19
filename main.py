@@ -1,56 +1,70 @@
 from fastapi import FastAPI
 import requests
-import subprocess
-import pandas as pd
+import gzip
+import xml.etree.ElementTree as ET
 import json
 import os
-from datetime import datetime
 
 app = FastAPI()
 
-KINGSTORE_URL = "https://kingstore.binaprojects.com/Download.aspx?File=Price7290058108879-340-202602190910.gz"
+PROMO_URL = "https://kingstore.binaprojects.com/Download.aspx?File=Promo7290058108879-340-202602191114.gz"
 
-@app.get("/update-prices")
-async def update_prices():
+@app.get("/update-promo")
+async def update_promo():
     try:
-        # 1. הורד קובץ gz
-        print("📥 מוריד קובץ...")
-        r = requests.get(KINGSTORE_URL)
-        with open("temp.gz", "wb") as f:
+        # 1. הורד מבצעים
+        print("📥 מוריד מבצעים...")
+        r = requests.get(PROMO_URL)
+        with open("promo.gz", "wb") as f:
             f.write(r.content)
         
-        # 2. הרץ price_converter
-        print("🔄 ממיר לאקסל...")
-        subprocess.run(["python", "price_converter.py", "temp.gz"])
+        # 2. פתח XML
+        with gzip.open("promo.gz", 'rt', encoding='utf-8') as f:
+            xml_content = f.read()
         
-        # 3. חפש אקסל שנוצר
-        excel_files = [f for f in os.listdir('.') if f.endswith('_מחירון.xlsx')]
-        if excel_files:
-            excel_file = excel_files[0]
-            df = pd.read_excel(excel_file)
-            products = df[['קוד מוצר', 'שם המוצר', 'מחיר (₪)']].to_dict('records')
+        # 3. חלץ מבצעים
+        root = ET.fromstring(xml_content)
+        promotions = []
+        
+        for promotion in root.findall('.//Promotion'):
+            promo_data = {
+                'תיאור': promotion.find('PromotionDescription').text if promotion.find('PromotionDescription') else '',
+                'תאריך': promotion.find('PromotionUpdateDate').text if promotion.find('PromotionUpdateDate') else '',
+                'מחיר_מבצע': promotion.find('DiscountedPrice').text if promotion.find('DiscountedPrice') else '',
+                'מינימום_כמות': promotion.find('MinQty').text if promotion.find('MinQty') else '',
+                'מוצרים': []
+            }
             
-            with open("products.json", "w", encoding='utf-8') as f:
-                json.dump(products, f, ensure_ascii=False, indent=2)
+            # חלץ קודי מוצרים
+            for item in promotion.findall('.//PromotionItems/Item'):
+                code = item.find('ItemCode').text if item.find('ItemCode') else ''
+                if code:
+                    promo_data['מוצרים'].append(code)
             
-            return {"status": "✅ עודכן!", "מוצרים": len(products), "קובץ": excel_file}
-        else:
-            return {"status": "❌ לא נמצא אקסל", "קבצים": os.listdir('.')}
-            
+            promotions.append(promo_data)
+        
+        # שמור JSON
+        with open("promotions.json", "w", encoding='utf-8') as f:
+            json.dump(promotions, f, ensure_ascii=False, indent=2)
+        
+        return {"status": "✅ מבצעים עודכנו!", "מבצעים": len(promotions)}
+        
     except Exception as e:
         return {"status": "❌ שגיאה", "error": str(e)}
 
-@app.get("/api/products")
-async def get_products(search: str = ""):
+@app.get("/api/promo")
+async def get_promo(search: str = ""):
     try:
-        with open("products.json", "r", encoding='utf-8') as f:
-            products = json.load(f)
+        with open("promotions.json", "r", encoding='utf-8') as f:
+            promos = json.load(f)
+        
         if search:
-            products = [p for p in products if search.lower() in str(p.get('שם המוצר', '')).lower()]
-        return products[:50]
+            promos = [p for p in promos if search.lower() in str(p.get('תיאור', '')).lower()]
+        
+        return promos[:10]
     except:
         return []
 
 @app.get("/")
 async def root():
-    return {"SmartMarket": "מוכן! קרא /update-prices"}
+    return {"SmartMarket": "מבצעים! קרא /update-promo"}
