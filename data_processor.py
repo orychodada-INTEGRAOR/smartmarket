@@ -23,45 +23,49 @@ class DataProcessor:
         self.cache_dir = cache_dir
         # יצירת תיקיית cache אם לא קיימת
         Path(cache_dir).mkdir(exist_ok=True)
-    
-  def process_gz(self, gz_content):
-    """
-    מעבד קובץ GZ או JSON ומחזיר רשימת מוצרים
-    """
-    try:
-        # בדיקה אם זה JSON (kingstore מחזיר JSON ישירות)
-        if gz_content.startswith(b'[{') or gz_content.startswith(b'{'):
-            # זה JSON - פרסור ישיר
-            import json
-            data = json.loads(gz_content.decode('utf-8'))
-            
-            # אם זה רשימה - זה כבר המוצרים
-            if isinstance(data, list):
-                products = []
-                for item in data:
-                    product = {
-                        'id': item.get('ItemCode', ''),
-                        'name': item.get('ItemNm', ''),
-                        'price': float(item.get('ItemPrice', 0)),
-                        'manufacturer': item.get('ManufacturerName', ''),
-                        'unit_measure': item.get('UnitOfMeasure', ''),
-                        'quantity': item.get('Quantity', ''),
-                        'unit_price': float(item.get('UnitOfMeasurePrice', 0)),
-                        'country': item.get('ManufactureCountry', ''),
-                        'allow_discount': item.get('AllowDiscount') == '1',
-                        'update_date': item.get('PriceUpdateDate', ''),
-                        'chain_id': item.get('ChainId', ''),
-                        'store_id': item.get('StoreId', ''),
-                        'timestamp': datetime.now().isoformat()
-                    }
-                    products.append(product)
-                
-                print(f"✅ עובדו {len(products)} מוצרים מ-JSON")
-                return products
+ def process_gz(self, gz_content):
+        """
+        מעבד קובץ GZ או JSON ומחזיר רשימת מוצרים
         
-        # אם זה לא JSON - נסה כ-GZ רגיל
-        # שלב 1: פתיחת הדחיסה
-        xml_content = gzip.decompress(gz_content).decode('utf-8')
+        Args:
+            gz_content: תוכן הקובץ הדחוס (bytes)
+            
+        Returns:
+            list: רשימת מוצרים
+        """
+        try:
+            # בדיקה אם זה JSON (kingstore מחזיר JSON ישירות)
+            if gz_content.startswith(b'[{') or gz_content.startswith(b'{'):
+                # זה JSON - פרסור ישיר
+                data = json.loads(gz_content.decode('utf-8'))
+                
+                # אם זה רשימה - זה כבר המוצרים
+                if isinstance(data, list):
+                    products = []
+                    for item in data:
+                        product = {
+                            'id': item.get('ItemCode', ''),
+                            'name': item.get('ItemNm', ''),
+                            'price': float(item.get('ItemPrice', 0)) if item.get('ItemPrice') else 0.0,
+                            'manufacturer': item.get('ManufacturerName', ''),
+                            'unit_measure': item.get('UnitOfMeasure', ''),
+                            'quantity': item.get('Quantity', ''),
+                            'unit_price': float(item.get('UnitOfMeasurePrice', 0)) if item.get('UnitOfMeasurePrice') else 0.0,
+                            'country': item.get('ManufactureCountry', ''),
+                            'allow_discount': item.get('AllowDiscount') == '1',
+                            'update_date': item.get('PriceUpdateDate', ''),
+                            'chain_id': item.get('ChainId', ''),
+                            'store_id': item.get('StoreId', ''),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        products.append(product)
+                    
+                    print(f"✅ עובדו {len(products)} מוצרים מ-JSON")
+                    return products
+            
+            # אם זה לא JSON - נסה כ-GZ רגיל
+            # שלב 1: פתיחת הדחיסה
+            xml_content = gzip.decompress(gz_content).decode('utf-8')
             
             # שלב 2: פרסור XML
             root = ET.fromstring(xml_content)
@@ -96,7 +100,6 @@ class DataProcessor:
         except Exception as e:
             print(f"❌ שגיאה בעיבוד: {e}")
             return []
-    
     def get_text(self, element, tag, default=''):
         """מחזיר טקסט מתגית XML או ערך ברירת מחדל"""
         child = element.find(tag)
