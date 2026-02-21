@@ -152,9 +152,13 @@ async def fetch_and_process(source_id: str):
             meta_data = response.json()
             if isinstance(meta_data, list) and len(meta_data) > 0:
                 if 'SPath' in meta_data[0]:
-                    # זה kingstore - צריך להוריד את הקובץ האמיתי
-                    real_url = meta_data[0]['SPath']
-                    print(f"🔗 נמצא SPath: {real_url}")
+                    # זה kingstore - צריך לבנות את ה-URL המלא
+                    base_path = meta_data[0]['SPath']
+                    # חלץ את שם הקובץ מה-URL המקורי
+                    filename = url.split('File=')[-1]
+                    real_url = base_path + filename
+                    print(f"🔗 בונה URL: {base_path} + {filename}")
+                    print(f"🔗 URL מלא: {real_url}")
                     
                     # הורדת הקובץ האמיתי
                     real_response = await download_with_retry(real_url, max_retries=3)
