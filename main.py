@@ -12,40 +12,28 @@ import asyncio
 from datetime import datetime
 import os
 
-# יצירת האפליקציה
 app = FastAPI(
     title="SmartMarket API",
     description="API לניהול מחירי קמעונאות בזמן אמת",
     version="1.0.0"
 )
 
-# יצירת המעבד
 processor = DataProcessor()
 
-# הגדרת CORS (כדי שהאפליקציה תוכל לגשת)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # בייצור - הגבל רק לדומיין שלך
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ========================================
-# הגדרת מקורות נתונים
-# ========================================
-# כאן תוסיף את ה-URLs של המחירונים
 SOURCES = {
     'kingstore': 'https://kingstore.binaprojects.com/Download.aspx?File=Price7290058108879-340-202602190910.gz',
 }
 
-# ========================================
-# נקודות קצה (Endpoints)
-# ========================================
-
 @app.get("/")
 async def root():
-    """דף הבית - מידע בסיסי"""
     return {
         "app": "SmartMarket API",
         "status": "🟢 פעיל",
@@ -58,26 +46,10 @@ async def root():
     }
 
 @app.get("/api/products")
-async def get_products(
-    search: str = "",
-    source: str = "all",
-    limit: int = 100
-):
-    """
-    מחזיר רשימת מוצרים
-    
-    Parameters:
-        search: טקסט לחיפוש (אופציונלי)
-        source: מקור ספציפי או 'all' (ברירת מחדל)
-        limit: מספר מוצרים מקסימלי (ברירת מחדל: 100)
-    
-    Example:
-        /api/products?search=חלב&limit=20
-    """
+async def get_products(search: str = "", source: str = "all", limit: int = 100):
     try:
         all_products = []
         
-        # קביעת אילו מקורות לטעון
         if source == "all":
             sources_to_load = SOURCES.keys()
         elif source in SOURCES:
@@ -85,20 +57,16 @@ async def get_products(
         else:
             raise HTTPException(status_code=400, detail=f"מקור לא קיים: {source}")
         
-        # טעינה מכל המקורות
         for src in sources_to_load:
-            # נסה cache קודם (טרי עד שעה)
             products = processor.load_from_cache(src, max_age_hours=1)
             
             if products is None:
-                # אין cache או ישן - נסה לעדכן
                 print(f"📥 מוריד נתונים טריים עבור {src}...")
                 products = await fetch_and_process(src)
             
             if products:
                 all_products.extend(products)
         
-        # חיפוש אם יש
         if search:
             search_lower = search.lower()
             all_products = [
@@ -107,7 +75,6 @@ async def get_products(
                    search_lower in p.get('manufacturer', '').lower()
             ]
         
-        # הגבלה
         limited_products = all_products[:limit]
         
         return {
@@ -123,21 +90,11 @@ async def get_products(
         print(f"❌ שגיאה: {e}")
         return JSONResponse(
             status_code=500,
-            content={
-                "success": False,
-                "error": str(e),
-                "products": []
-            }
+            content={"success": False, "error": str(e), "products": []}
         )
 
 @app.get("/update-all")
 async def update_all(background_tasks: BackgroundTasks):
-    """
-    מעדכן את כל מקורות הנתונים ברקע
-    
-    זה לא חוסם - מחזיר תשובה מיד ומעדכן ברקע
-    """
-    # הוספת משימות רקע
     updated_sources = []
     for source_id in SOURCES.keys():
         background_tasks.add_task(fetch_and_process, source_id)
@@ -151,27 +108,8 @@ async def update_all(background_tasks: BackgroundTasks):
         "note": "בדוק /status אחרי דקה"
     }
 
-@app.get("/update/{source_id}")
-async def update_source(source_id: str, background_tasks: BackgroundTasks):
-    """עדכון מקור בודד"""
-    if source_id not in SOURCES:
-        raise HTTPException(status_code=404, detail=f"מקור לא קיים: {source_id}")
-    
-    background_tasks.add_task(fetch_and_process, source_id)
-    
-    return {
-        "success": True,
-        "message": f"⏳ מעדכן {source_id} ברקע...",
-        "source": source_id
-    }
-
 @app.get("/status")
 async def status():
-    """
-    מחזיר סטטוס של כל המערכת
-    
-    כולל מידע על cache, מקורות, ועדכונים אחרונים
-    """
     cache_status = processor.get_cache_status()
     
     sources_info = {}
@@ -188,31 +126,12 @@ async def status():
             }
     
     return {
-        "system": {
-            "status": "🟢 פעיל",
-            "time": datetime.now().isoformat()
-        },
+        "system": {"status": "🟢 פעיל", "time": datetime.now().isoformat()},
         "sources": sources_info,
-        "cache": {
-            "location": processor.cache_dir,
-            "files": len(cache_status)
-        }
+        "cache": {"location": processor.cache_dir, "files": len(cache_status)}
     }
 
-# ========================================
-# פונקציות עזר
-# ========================================
-
 async def fetch_and_process(source_id: str):
-    """
-    מוריד ומעבד מקור נתונים בודד
-    
-    Args:
-        source_id: מזהה המקור
-        
-    Returns:
-        list: רשימת מוצרים או רשימה ריקה אם נכשל
-    """
     try:
         url = SOURCES.get(source_id)
         if not url:
@@ -221,12 +140,33 @@ async def fetch_and_process(source_id: str):
         
         print(f"📡 מוריד מ-{source_id}...")
         
-        # הורדה עם retry
+        # שלב 1: הורדת המטא-דאטה
         response = await download_with_retry(url, max_retries=3)
         
         if response is None:
             print(f"❌ הורדה נכשלה עבור {source_id}")
             return []
+        
+        # שלב 2: בדיקה אם זה JSON עם SPath
+        try:
+            meta_data = response.json()
+            if isinstance(meta_data, list) and len(meta_data) > 0:
+                if 'SPath' in meta_data[0]:
+                    # זה kingstore - צריך להוריד את הקובץ האמיתי
+                    real_url = meta_data[0]['SPath']
+                    print(f"🔗 נמצא SPath: {real_url}")
+                    
+                    # הורדת הקובץ האמיתי
+                    real_response = await download_with_retry(real_url, max_retries=3)
+                    if real_response is None:
+                        print(f"❌ הורדת הקובץ האמיתי נכשלה")
+                        return []
+                    
+                    response = real_response
+                    print(f"✅ הורדה הושלמה ({len(response.content)} bytes)")
+        except:
+            # לא JSON או לא kingstore - נמשיך עם התוכן המקורי
+            pass
         
         print(f"✅ הורדה הושלמה ({len(response.content)} bytes)")
         
@@ -234,7 +174,6 @@ async def fetch_and_process(source_id: str):
         products = processor.process_gz(response.content)
         
         if products:
-            # שמירה ל-cache
             processor.save_to_cache(products, source_id)
             print(f"✅ {source_id}: {len(products)} מוצרים עודכנו")
         else:
@@ -249,16 +188,6 @@ async def fetch_and_process(source_id: str):
         return []
 
 async def download_with_retry(url: str, max_retries: int = 3):
-    """
-    מוריד קובץ עם ניסיונות חוזרים
-    
-    Args:
-        url: כתובת ההורדה
-        max_retries: מספר ניסיונות מקסימלי
-        
-    Returns:
-        Response object או None
-    """
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
@@ -267,21 +196,14 @@ async def download_with_retry(url: str, max_retries: int = 3):
         try:
             print(f"📥 ניסיון {attempt + 1}/{max_retries}...")
             
-            response = requests.get(
-                url,
-                headers=headers,
-                timeout=30,
-                allow_redirects=True
-            )
-            
-            response.raise_for_status()  # יזרוק שגיאה אם לא 200
+            response = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+            response.raise_for_status()
             return response
             
         except requests.RequestException as e:
             print(f"⚠️ ניסיון {attempt + 1} נכשל: {e}")
             
             if attempt < max_retries - 1:
-                # המתנה לפני ניסיון הבא (exponential backoff)
                 wait_time = 2 ** attempt
                 print(f"⏳ ממתין {wait_time} שניות...")
                 await asyncio.sleep(wait_time)
@@ -291,26 +213,8 @@ async def download_with_retry(url: str, max_retries: int = 3):
     
     return None
 
-# ========================================
-# הפעלה
-# ========================================
-
 if __name__ == "__main__":
     import uvicorn
-    
     port = int(os.environ.get("PORT", 8000))
-    
-    print("=" * 60)
     print("🚀 SmartMarket API Server")
-    print("=" * 60)
-    print(f"🌐 Port: {port}")
-    print(f"📂 Cache: {processor.cache_dir}")
-    print(f"🔗 Sources: {len(SOURCES)}")
-    print("=" * 60)
-    
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
