@@ -29,7 +29,9 @@ app.add_middleware(
 )
 
 SOURCES = {
-    'kingstore': 'https://kingstore.binaprojects.com/Download.aspx?File=Price7290058108879-340-202602190910.gz',
+  SOURCES = {
+    'shufersal_001': 'https://pricesprodpublic.blob.core.windows.net/price/Price7290027600007-001-202602220200.gz?sv=2014-02-14&sr=b&sig=Hff8zJRk%2FWnG1HcIwVoNR%2BTs5ETQfQ5c33uSct46otU%3D&se=2026-02-22T06%3A27%3A18Z&sp=r'
+}
 }
 
 @app.get("/")
