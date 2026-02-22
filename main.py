@@ -1,8 +1,3 @@
-"""
-SmartMarket - Main API Server
-שרת ראשי לניהול מחירים בזמן אמת
-"""
-
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,11 +23,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔥 מקור נתונים אמיתי משופרסל
 SOURCES = {
-   SOURCES = {
     'shufersal_001': 'https://prices.shufersal.co.il/Price/Price7290027600007-001-202602220900.gz'
-}
 }
 
 @app.get("/")
