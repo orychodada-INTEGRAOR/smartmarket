@@ -9,6 +9,8 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import zipfile
+import io
 
 class DataProcessor:
     """מחלקה לעיבוד מחירונים"""
@@ -19,7 +21,31 @@ class DataProcessor:
     
     def process_gz(self, gz_content):
         try:
-            # בדיקה אם זה JSON
+            # בדיקה 1: האם זה ZIP?
+            if gz_content.startswith(b'PK'):
+                print("📦 זיהוי: קובץ ZIP")
+                with zipfile.ZipFile(io.BytesIO(gz_content)) as zf:
+                    # קרא את הקובץ הראשון בתוך ה-ZIP
+                    filename = zf.namelist()[0]
+                    print(f"📂 פותח: {filename}")
+                    xml_content = zf.read(filename).decode('utf-8')
+                    root = ET.fromstring(xml_content)
+                    
+                    products = []
+                    for item in root.findall('.//Item'):
+                        product = {
+                            'id': self.get_text(item, 'ItemCode'),
+                            'name': self.get_text(item, 'ItemNm'),
+                            'price': self.get_float(item, 'ItemPrice'),
+                            'manufacturer': self.get_text(item, 'ManufacturerName'),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        products.append(product)
+                    
+                    print(f"✅ עובדו {len(products)} מוצרים מ-ZIP")
+                    return products
+            
+            # בדיקה 2: האם זה JSON?
             if gz_content.startswith(b'[{') or gz_content.startswith(b'{'):
                 data = json.loads(gz_content.decode('utf-8'))
                 
@@ -31,7 +57,6 @@ class DataProcessor:
                             'name': str(item.get('ItemNm', '')),
                             'price': float(item.get('ItemPrice', 0)) if item.get('ItemPrice') else 0.0,
                             'manufacturer': str(item.get('ManufacturerName', '')),
-                            'unit_measure': str(item.get('UnitOfMeasure', '')),
                             'timestamp': datetime.now().isoformat()
                         }
                         products.append(product)
@@ -39,7 +64,7 @@ class DataProcessor:
                     print(f"✅ עובדו {len(products)} מוצרים מ-JSON")
                     return products
             
-            # נסה GZ
+            # בדיקה 3: נסה GZ רגיל
             xml_content = gzip.decompress(gz_content).decode('utf-8')
             root = ET.fromstring(xml_content)
             
@@ -54,7 +79,7 @@ class DataProcessor:
                 }
                 products.append(product)
             
-            print(f"✅ עובדו {len(products)} מוצרים")
+            print(f"✅ עובדו {len(products)} מוצרים מ-GZ")
             return products
             
         except Exception as e:
