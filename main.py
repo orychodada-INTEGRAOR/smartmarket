@@ -19,7 +19,7 @@ processor = DataProcessor()
 # -----------------------------
 # מקורות מחירונים
 # -----------------------------
-SOURCES = {SOURCES = {
+SOURCES = SOURCES = {
     "shufersal": "https://prices.shufersal.co.il/FileObject/UpdatePriceFull/7290027600007/PriceFull7290027600007-001-202402221200.gz",
     "ramilevy": "https://www.rami-levy.co.il/price/pricefull/7290058140886/PriceFull7290058140886-001-202402221200.gz",
     "victory": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290055700004/PriceFull7290055700004-001-202402221200.gz",
@@ -29,8 +29,6 @@ SOURCES = {SOURCES = {
     "freshmarket": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290058170005/PriceFull7290058170005-001-202402221200.gz",
     "kingstore": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290058110001/PriceFull7290058110001-001-202402221200.gz"
 }
-}
-
 
 # -----------------------------
 # הורדה עם Retry
