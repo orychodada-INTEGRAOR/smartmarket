@@ -3,6 +3,7 @@ from data_sources import get_latest_file_url
 from fetcher import fetch_with_headers
 from data_processor import DataProcessor
 from db import bulk_upsert_products, bulk_insert_prices
+from utils import extract_store_id   # ← זיהוי מספר סניף
 
 app = FastAPI()
 
@@ -17,10 +18,6 @@ TARGETS = [
 
 @app.get("/update-all")
 async def update_all():
-    """
-    מפעיל את הצייד על כל הרשתות, מוריד את הקובץ הכי חדש,
-    מפענח, ומכניס ל-DB.
-    """
     processor = DataProcessor()
     results = {}
     total_products = 0
@@ -42,20 +39,21 @@ async def update_all():
             # 3) פענוח GZ/XML
             products, prices = processor.process_gz(content)
 
-            # 4) הזרקה ל-DB
-            if products:
-                # הוספת chain_id ו-store_id (אם תרצה נבנה לוגיקה חכמה)
-                for p in products:
-                    p["chain_id"] = source_id
-                    p["store_id"] = "000"
+            # 4) זיהוי store_id מתוך שם הקובץ
+            filename = url.split("/")[-1]
+            store_id = extract_store_id(filename) or "000"
 
-                bulk_upsert_products(products)
-                bulk_insert_prices(prices)
+            # 5) הוספת chain_id ו-store_id לכל מוצר
+            for p in products:
+                p["chain_id"] = source_id
+                p["store_id"] = store_id
 
-                total_products += len(products)
-                results[source_id] = f"OK — {len(products)} מוצרים"
-            else:
-                results[source_id] = "לא נמצאו מוצרים בקובץ"
+            # 6) הזרקה ל-DB
+            bulk_upsert_products(products)
+            bulk_insert_prices(prices)
+
+            total_products += len(products)
+            results[source_id] = f"OK — {len(products)} מוצרים (סניף {store_id})"
 
         except Exception as e:
             results[source_id] = f"שגיאה: {str(e)}"
