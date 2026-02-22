@@ -19,10 +19,16 @@ processor = DataProcessor()
 # -----------------------------
 # מקורות מחירונים
 # -----------------------------
-SOURCES = {
-    "shufersal": "https://url-to-file.gz",
-    "victory": "https://url-to-file.gz",
-    "ramilevy": "https://url-to-file.gz"
+SOURCES = {SOURCES = {
+    "shufersal": "https://prices.shufersal.co.il/FileObject/UpdatePriceFull/7290027600007/PriceFull7290027600007-001-202402221200.gz",
+    "ramilevy": "https://www.rami-levy.co.il/price/pricefull/7290058140886/PriceFull7290058140886-001-202402221200.gz",
+    "victory": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290055700004/PriceFull7290055700004-001-202402221200.gz",
+    "hazi_hinam": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290661400001/PriceFull7290661400001-001-202402221200.gz",
+    "yenot_bitan": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290876100004/PriceFull7290876100004-001-202402221200.gz",
+    "mahsanei_hashuk": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290633800006/PriceFull7290633800006-001-202402221200.gz",
+    "freshmarket": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290058170005/PriceFull7290058170005-001-202402221200.gz",
+    "kingstore": "https://matrixcatalog.co.il/NBCompetitionRegulations/PriceFull/7290058110001/PriceFull7290058110001-001-202402221200.gz"
+}
 }
 
 
