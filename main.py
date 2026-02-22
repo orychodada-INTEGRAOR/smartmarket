@@ -7,6 +7,9 @@ import asyncio
 from datetime import datetime
 import os
 
+# ⬅️ הוספה חשובה: חיבור למסד הנתונים
+from db import init_db
+
 app = FastAPI(
     title="SmartMarket API",
     description="API לניהול מחירי קמעונאות בזמן אמת",
@@ -14,6 +17,13 @@ app = FastAPI(
 )
 
 processor = DataProcessor()
+
+# ⬅️ הפעלת יצירת הטבלאות בזמן עליית השרת
+@app.on_event("startup")
+async def startup_event():
+    print("🔧 Initializing database...")
+    init_db()
+    print("✅ Database ready")
 
 app.add_middleware(
     CORSMiddleware,
