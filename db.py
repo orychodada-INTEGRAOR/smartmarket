@@ -41,3 +41,41 @@ def bulk_insert_prices(prices):
     conn.commit()
     cur.close()
     conn.close()
+    from db import bulk_upsert_products, bulk_insert_prices
+
+async def process_gov_sources():
+    from gov_sources import SOURCES, fetch_gov_file
+
+    results = {}
+    total = 0
+
+    for name, url in SOURCES.items():
+        print(f"📡 מוריד {name}...")
+        data = await fetch_gov_file(url)
+
+        products = []
+        prices = []
+
+        for item in data:
+            products.append({
+                "barcode": item.get("item_code"),
+                "name": item.get("item_name"),
+                "manufacturer": item.get("manufacturer_name"),
+                "chain_id": item.get("chain_id"),
+                "store_id": item.get("store_id"),
+            })
+
+            prices.append({
+                "barcode": item.get("item_code"),
+                "price": item.get("item_price"),
+                "store_id": item.get("store_id"),
+                "chain_id": item.get("chain_id"),
+            })
+
+        bulk_upsert_products(products)
+        bulk_insert_prices(prices)
+
+        results[name] = len(products)
+        total += len(products)
+
+    return {"total": total, "details": results}

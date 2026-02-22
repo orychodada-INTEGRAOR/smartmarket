@@ -63,3 +63,4 @@ async def update_all():
         "total_products": total_products,
         "results": results
     }
+from gov_sources import process_gov_sources
