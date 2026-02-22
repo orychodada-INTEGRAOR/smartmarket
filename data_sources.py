@@ -1,64 +1,64 @@
 import httpx
-import re
-from datetime import datetime
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
-GOV_API = "https://www.gov.il/api/DownloadFile?fileName=PriceFull"
+# דפי שקיפות מחירים אמיתיים
+CHAIN_PAGES = {
+    "good_pharm": "https://goodpharm.binaprojects.com/Main.aspx",
+    "laib": "https://laibcatalog.co.il/",
+    "zol_vebegadol": "https://zolvebegadol.binaprojects.com/Main.aspx",
+    "hazi_hinam": "https://shop.hazi-hinam.co.il/Prices"
+}
 
-PRICEFULL_PATTERN = re.compile(r"PriceFull.*?(\d{12})\.gz$")
-PRICEUPDATE_PATTERN = re.compile(r"PriceUpdate.*?(\d{12})\.gz$")
-
-
-async def fetch_gov_list():
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.get(GOV_API)
-        response.raise_for_status()
-        return response.json()
-
-
-def extract_timestamp(filename):
-    match = re.search(r"(\d{12})", filename)
-    if not match:
-        return None
-    return datetime.strptime(match.group(1), "%Y%m%d%H%M")
+# אילו סוגי קבצים אנחנו מחפשים
+VALID_KEYWORDS = ["PriceFull", "PriceUpdate", "Promo", "Price", "Full", "Update"]
+VALID_EXTENSIONS = [".gz", ".zip", ".xml"]
 
 
-def pick_latest(files, pattern):
-    candidates = []
-    for f in files:
-        if pattern.search(f["FileName"]):
-            ts = extract_timestamp(f["FileName"])
-            if ts:
-                candidates.append((ts, f["DownloadUrl"]))
-
-    if not candidates:
+async def get_latest_file_url(source_id: str):
+    """
+    סורק דף שקיפות מחירים ומחזיר את הקובץ הכי חדש.
+    מותאם לדפים כמו GoodPharm / זול ובגדול / חצי חינם.
+    """
+    base_url = CHAIN_PAGES.get(source_id)
+    if not base_url:
+        print(f"⚠️ אין דף מוגדר עבור {source_id}")
         return None
 
-    candidates.sort(reverse=True)
-    return candidates[0][1]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "*/*",
+        "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8"
+    }
 
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=30.0) as client:
+        try:
+            response = await client.get(base_url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
 
-async def get_latest_sources():
-    print("📡 מוריד רשימת קבצים ממשרד הכלכלה...")
-    files = await fetch_gov_list()
+            links = []
 
-    sources = {}
+            # חיפוש בכל הלינקים בעמוד
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
 
-    for f in files:
-        chain_id = f.get("ChainId")
-        if not chain_id:
-            continue
+                # בדיקה אם הלינק מכיל מילות מפתח של קבצי מחירון
+                if any(key in href for key in VALID_KEYWORDS) and any(ext in href for ext in VALID_EXTENSIONS):
+                    full_url = urljoin(base_url, href)
+                    links.append(full_url)
 
-        if chain_id not in sources:
-            sources[chain_id] = {"full": None, "update": None}
+            if not links:
+                print(f"⚠️ לא נמצאו קבצי מחירון ב-{source_id}")
+                return None
 
-    for chain_id in sources.keys():
-        chain_files = [f for f in files if f.get("ChainId") == chain_id]
+            # מיון לפי שם הקובץ (שבד"כ מכיל תאריך)
+            links.sort(reverse=True)
+            latest = links[0]
 
-        latest_full = pick_latest(chain_files, PRICEFULL_PATTERN)
-        latest_update = pick_latest(chain_files, PRICEUPDATE_PATTERN)
+            print(f"🎯 Hunter: נמצא קובץ טרי עבור {source_id}: {latest}")
+            return latest
 
-        sources[chain_id]["full"] = latest_full
-        sources[chain_id]["update"] = latest_update
-
-    print("✅ נמצא מידע עדכני לכל הרשתות")
-    return sources
+        except Exception as e:
+            print(f"❌ שגיאה בסריקת {source_id}: {e}")
+            return None
