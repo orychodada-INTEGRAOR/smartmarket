@@ -1,66 +1,13 @@
 from fastapi import FastAPI
-from data_sources import get_latest_file_url
-from fetcher import fetch_with_headers
-from data_processor import DataProcessor
-from db import bulk_upsert_products, bulk_insert_prices
-from utils import extract_store_id   # ← זיהוי מספר סניף
+from gov_sources import process_gov_sources
 
 app = FastAPI()
 
-# רשימת הרשתות שהצייד יודע לטפל בהן
-TARGETS = [
-    "good_pharm",
-    "laib",
-    "zol_vebegadol",
-    "hazi_hinam"
-]
-
-
 @app.get("/update-all")
 async def update_all():
-    processor = DataProcessor()
-    results = {}
-    total_products = 0
-
-    for source_id in TARGETS:
-        print(f"\n🚀 מחפש קובץ עבור {source_id}...")
-
-        # 1) מציאת קובץ הכי חדש
-        url = await get_latest_file_url(source_id)
-        if not url:
-            results[source_id] = "לא נמצא קובץ"
-            continue
-
-        try:
-            # 2) הורדה עם headers (עוקף חסימות)
-            print(f"📡 מוריד קובץ מ-{source_id}...")
-            content = await fetch_with_headers(url)
-
-            # 3) פענוח GZ/XML
-            products, prices = processor.process_gz(content)
-
-            # 4) זיהוי store_id מתוך שם הקובץ
-            filename = url.split("/")[-1]
-            store_id = extract_store_id(filename) or "000"
-
-            # 5) הוספת chain_id ו-store_id לכל מוצר
-            for p in products:
-                p["chain_id"] = source_id
-                p["store_id"] = store_id
-
-            # 6) הזרקה ל-DB
-            bulk_upsert_products(products)
-            bulk_insert_prices(prices)
-
-            total_products += len(products)
-            results[source_id] = f"OK — {len(products)} מוצרים (סניף {store_id})"
-
-        except Exception as e:
-            results[source_id] = f"שגיאה: {str(e)}"
+    gov_result = await process_gov_sources()
 
     return {
         "status": "complete",
-        "total_products": total_products,
-        "results": results
+        "gov_data": gov_result
     }
-from gov_sources import process_gov_sources
